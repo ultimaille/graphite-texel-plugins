@@ -1,0 +1,7 @@
+*
+
+!.gitignore
+!Plugins.txt
+!*/
+!Inspect/**
+!Interactions/**
