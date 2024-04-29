@@ -101,7 +101,6 @@ namespace OGF {
       //   auto interpreter = Interpreter::instance_by_language("Lua");
       //   auto render_area = interpreter->resolve_object("main.render_area", false);
 
-      // Note: see all possible events in render_area.h
         auto key_down_listener = new SlotConnection(scene_graph()->get_render_area(), "key_down", this, "key_down");
         auto key_up_listener = new SlotConnection(scene_graph()->get_render_area(), "key_up", this, "key_up");
         auto mouse_down_listener = new SlotConnection(scene_graph()->get_render_area(), "mouse_down", this, "mouse_down");
@@ -117,6 +116,7 @@ namespace OGF {
    void MeshGrobTransformInteractionsTool::mouse_down(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift) {
       std::cout << "button: " << button << std::endl;
 
+      pressed_button = button;
       mouse_down_pos = ndc_to_dc(point_ndc);
 
       // Call grab, select multiple points !
@@ -126,28 +126,33 @@ namespace OGF {
    }
 
    void MeshGrobTransformInteractionsTool::mouse_up(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift) {
+      pressed_button = MOUSE_BUTTON_NONE;
+
       if (pressedKey == "control")
          release(RayPick(point_ndc, button));
    }
 
    void MeshGrobTransformInteractionsTool::mouse_move(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, const vec2& delta_ndc, double delta_x_ndc, double delta_y_ndc, const vec2& delta_wc, int button, bool control, bool shift) {
       // Update paint interactor on mouse move (when moving camera)
-      if (pressedKey == "control") {
-         paint_transform_interactor();
-      }
+      // if (pressedKey == "control") {
+      //    paint_transform_interactor();
+      // }
 
-      // Draw rect for selection
-      if (pressedKey == "shift" && button == MOUSE_BUTTON_LEFT) {
+      // // Draw rect for selection
+      // if (pressedKey == "shift" && button == MOUSE_BUTTON_LEFT) {
 
-         rendering_context->overlay().clear();
+      //    rendering_context->overlay().clear();
             
-         auto pdc = ndc_to_dc(point_ndc);
-         rendering_context->overlay().fillrect(
-            mouse_down_pos, pdc, Color(.5, .5, .5, 0.3)
-         );
+      //    auto pdc = ndc_to_dc(point_ndc);
+      //    rendering_context->overlay().fillrect(
+      //       mouse_down_pos, pdc, Color(.5, .5, .5, 0.3)
+      //    );
 
          
-      }
+      // }
+
+      if (pressedKey == "control")
+         paint_overlay(ndc_to_dc(point_ndc));
    }
 
    
@@ -202,6 +207,7 @@ namespace OGF {
       else if (distz < distx && distz < disty)
          selected_axis = vec3(0, 0, 1);
 
+      // Test if we grab the interactor axis or planes
       is_grab_interactor |= distx < 6 || disty < 6 || distz < 6;
 
       index_t v_idx = pick_vertex(p_ndc);
@@ -217,12 +223,14 @@ namespace OGF {
       }
 
       // Unselect
-      if (selected_vertex != NO_VERTEX && p_ndc.button == MOUSE_BUTTON_RIGHT) {
-         selected_vertex = NO_VERTEX;
+      if (p_ndc.button == MOUSE_BUTTON_RIGHT) {
+         // selected_vertex = NO_VERTEX;
          unselect_all_verts();
+         std::cout << "UNSELECT" << std::endl;
       }
 
-      paint_transform_interactor();
+      // paint_transform_interactor();
+      paint_overlay(p_dc);
 
 
       MeshGrobTool::grab(p_ndc);
@@ -230,23 +238,6 @@ namespace OGF {
 
     void MeshGrobTransformInteractionsTool::drag(const RayPick& p_ndc) {
       
-      // rendering_context()->overlay().clear();
-
-      // if (pressedKey == "shift" && (selected_vertex == NO_VERTEX || get_selected_verts().empty())) {
-         
-      //    auto pdc = ndc_to_dc(p_ndc.p_ndc);
-      //    rendering_context()->overlay().fillrect(
-      //       mouse_down_pos, pdc, Color(.5, .5, .5, 0.3)
-      //    );
-
-
-      //    return;
-      // }
-      // TODO maybe I should uncomment this 
-      // if (get_selected_verts().empty()) {
-      //    return;
-      // }
-
       // Get mouse move delta
       vec2 m_delta = p_ndc.p_ndc - m_last_pos;
 
@@ -270,7 +261,9 @@ namespace OGF {
 
       m_last_pos = p_ndc.p_ndc;
 
-      paint_transform_interactor();
+      // paint_transform_interactor();
+      paint_overlay(ndc_to_dc(p_ndc.p_ndc));
+
 
 
        // Some tools may also do special actions
@@ -334,12 +327,29 @@ namespace OGF {
       return { origin, xp, xyp, yp };
    }
 
+   void MeshGrobTransformInteractionsTool::paint_overlay(vec2 pdc) {
+
+      rendering_context()->overlay().clear();
+
+      if (pressed_button == MOUSE_BUTTON_LEFT && pressedKey == "shift") {
+         rendering_context()->overlay().fillrect(
+            mouse_down_pos, pdc, Color(.5, .5, .5, 0.3)
+
+         );
+      }
+
+      paint_transform_interactor();
+   }
+
     void MeshGrobTransformInteractionsTool::paint_transform_interactor() {
 
       // std::cout << "paint" << std::endl;
-      rendering_context()->overlay().clear();
+      // rendering_context()->overlay().clear();
+      if (get_selected_verts().empty())
+         return;
+      
 
-      if (selected_vertex != NO_VERTEX || get_selected_verts().empty()) {
+      // if (!get_selected_verts().empty()) {
          
          // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
 
@@ -397,7 +407,7 @@ namespace OGF {
             z_quad[0], z_quad[1], z_quad[2], z_quad[3], Color(0, 0, b, 0.3)
          );
 
-      }
+      // }
 
     }
 
@@ -409,10 +419,13 @@ namespace OGF {
       // No axis selected
       selected_axis = vec3(0, 0, 0);
 
-      if (selected_vertex != NO_VERTEX || get_selected_verts().empty())
-         paint_transform_interactor();
-      else
-         rendering_context()->overlay().clear();
+      // if (selected_vertex != NO_VERTEX || get_selected_verts().empty())
+      //    paint_transform_interactor();
+      // else
+      //    rendering_context()->overlay().clear();
+      // paint_transform_interactor();
+      paint_overlay(ndc_to_dc(p_ndc.p_ndc));
+
 
       MeshGrobTool::release(p_ndc);
    }

@@ -87,6 +87,7 @@ namespace OGF {
          */
         void release(const RayPick& p_ndc) override;
 
+        void paint_overlay(vec2 pdc);
         void paint_transform_interactor();
 
 
@@ -119,7 +120,10 @@ namespace OGF {
         GEO::vector<index_t> y_axis_facets;
         GEO::vector<index_t> z_axis_facets;
         vec3 selected_axis;
+        // Keyboard / mouse state
         std::string pressedKey;
+        int pressed_button;
+
         vec2 mouse_down_pos;
     } ;
 
