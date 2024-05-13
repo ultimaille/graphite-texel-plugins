@@ -42,6 +42,7 @@
 #include <OGF/Inspect/tools/mesh_grob_lace_viewer_tool.h>
 #include <OGF/scene_graph/types/scene_graph_shader_manager.h>
 #include <OGF/mesh/shaders/mesh_grob_shader.h>
+#include "ConnectivityHelper.h"
 
 #include <limits>
 #include <chrono>
@@ -49,25 +50,248 @@
 
 namespace OGF {
 
+    index_t cell_edge_to_cell_facet_edge(const MeshGrob *mesh_grob, index_t c, index_t lf, index_t le) {
+
+        index_t v0 = mesh_grob->cells.edge_vertex(c, le, 0);
+        index_t v1 = mesh_grob->cells.edge_vertex(c, le, 1);
+        std::cout << "---" << std::endl;
+        std::cout << "---" << std::endl;
+        std::cout << "---" << std::endl;
+
+
+        std::cout << "cell:" << c << ", f:" << lf << std::endl;
+        // std::cout << v0 << "->" << v1 << std::endl;
+
+        // for (index_t fi = 0; fi < mesh_grob->cells.nb_facets(c); fi++) {
+
+            auto nb_verts = mesh_grob->cells.facet_nb_vertices(c, lf);
+
+            for (index_t lv = 0; lv < nb_verts; lv++) {
+                auto fv0 = mesh_grob->cells.facet_vertex(c, lf, lv);
+                auto fv1 = mesh_grob->cells.facet_vertex(c, lf, (lv + 1) % nb_verts);
+                std::cout << fv0 << "->" << fv1 << std::endl;
+
+                if ((v0 == fv0 && v1 == fv1) || (v0 == fv1 && v1 == fv0)) {
+                    std::cout << "le: " << le << "," << v0 << "->" << v1 << ", lv:" << lv << std::endl;
+                    return lv;
+                }
+            }
+
+            // for (index_t cur_e = 0; cur_e < mesh_grob->cells.facet_nb_vertices(c, fi); cur_e++) {
+
+            // }
+
+            // for (index_t cur_e = 0; cur_e < mesh_grob->cells.facet_nb_vertices(c, fi); cur_e++) {
+                
+            //     if (mesh_grob->cells.facet_vertex(c, fi, cur_e) == v && fi == lf) {
+            //         return cur_e;
+            //     }
+            // }
+        // }
+
+        return NO_EDGE;
+    }
+
+    index_t cell_facet_edge_to_cell_edge(const MeshGrob *mesh_grob, index_t c, index_t lf, index_t e) {
+
+        auto nb_verts = mesh_grob->cells.facet_nb_vertices(c, lf);
+
+        index_t v0 = mesh_grob->cells.facet_vertex(c, lf, e);
+        index_t v1 = mesh_grob->cells.facet_vertex(c, lf, (e + 1) % nb_verts);
+
+        for (int cur_e = 0; cur_e < 12; cur_e++) {
+            auto cur_v0 = mesh_grob->cells.edge_vertex(c, cur_e, 0);
+            auto cur_v1 = mesh_grob->cells.edge_vertex(c, cur_e, 1);
+            if ((v0 == cur_v0 && v1 == cur_v1) || (v0 == cur_v1 && v1 == cur_v0))
+                return cur_e;
+        }
+
+        return NO_EDGE;
+    }
+
     MeshGrobLaceViewerTool::MeshGrobLaceViewerTool(
         ToolsManager* parent
     ) : MeshGrobTool(parent) {
+
     }
 
     MeshGrobLaceViewerTool::~MeshGrobLaceViewerTool() { 
     }
 
+    index_t MeshGrobLaceViewerTool::pickup_edge(vec3 p0, index_t c_idx) {
+        // Search nearest edge
+        double min_dist = std::numeric_limits<double>().max();
+        index_t e_idx = -1;
+
+        // Search nearest edge
+        for (int i = 0; i < mesh_grob()->cells.nb_edges(c_idx); i++) {
+            // Get points from current edge
+            index_t v0_idx = mesh_grob()->cells.edge_vertex(c_idx, i, 0);
+            index_t v1_idx = mesh_grob()->cells.edge_vertex(c_idx, i, 1);
+            vec3 &p1 = mesh_grob()->vertices.point(v0_idx);
+            vec3 &p2 = mesh_grob()->vertices.point(v1_idx);
+
+            // Compute dist from mouse point to edge points
+            double dist = length(cross(p0 - p1, p0 - p2)) / length(p2 - p1);
+            // std::cout << "dist: " << dist << std::endl;
+            // Keep min dist
+            if (dist < min_dist) {
+                min_dist = dist;
+                e_idx = i;
+            }
+        }
+
+        std::cout << "Found nearest edge: " << e_idx << std::endl;
+
+        return e_idx;
+    }
+
+    std::tuple<index_t, index_t> MeshGrobLaceViewerTool::pickup_facet(vec3 p0, index_t c_idx) {
+        // Search if point is on facet
+        double min_dist = std::numeric_limits<double>().max();
+        index_t f_idx = NO_FACET;
+        index_t lf_idx = NO_FACET;
+
+        // std::cout << "p0: " << p0 << std::endl;
+        // std::cout << "c_idx: " << c_idx << std::endl;
+
+        // std::cout << "n facet: " << mesh_grob()->cells.nb_facets(c_idx) << std::endl;
+        // std::cout << "n verts: " << mesh_grob()->cells.nb_vertices(c_idx) << std::endl;
+
+        for (index_t lf = 0; lf < mesh_grob()->cells.nb_facets(c_idx); lf++) {
+            // std::cout << "n verts in facet: " << mesh_grob()->cells.facet_nb_vertices(c_idx, lf) << std::endl;
+
+            auto a = mesh_grob()->vertices.point(mesh_grob()->cells.facet_vertex(c_idx, lf, 0));
+            auto b = mesh_grob()->vertices.point(mesh_grob()->cells.facet_vertex(c_idx, lf, 1));
+            auto c = mesh_grob()->vertices.point(mesh_grob()->cells.facet_vertex(c_idx, lf, 2));
+            auto d = mesh_grob()->vertices.point(mesh_grob()->cells.facet_vertex(c_idx, lf, 3));
+
+            auto n = normalize(cross(b - a, c - b));
+            // double dist = dot(p0 - d, n);
+            double dist = dot(p0 - a, n);
+            // std::cout << "DIST:" << dot(p0 - d, n) << std::endl;
+            
+            if (dist < min_dist) {
+                min_dist = dist;
+                f_idx = mesh_grob()->cells.facet(c_idx, lf);
+                lf_idx = lf;
+            }
+        }
+
+        // std::cout << "Found nearest facet: " << f_idx << std::endl;
+        // std::cout << "Found nearest facet: " << lf_idx << std::endl;
+
+        return std::tuple<index_t, index_t>(f_idx, lf_idx);
+    }
+
     // Propagate an hex layer perpendicular to a given halfedge (Breadth-First-Search)
-    void MeshGrobLaceViewerTool::bfs_cell_propagate(const OGF::MeshGrob *mesh_grob, index_t c, int max_depth, std::function<void(index_t, int)> f) {
+    void MeshGrobLaceViewerTool::bfs_layer_propagate(const OGF::MeshGrob *mesh_grob, index_t c, index_t lf, index_t le, int max_depth, std::function<void(index_t, int)> f) {
 
-
-        std::vector<bool> visited(mesh_grob->cells.nb());
+        
+        Attribute<Numeric::uint8> visited(
+            mesh_grob->cells.attributes(), "filter"
+        );
 
         Attribute<Numeric::uint32> dist(
             mesh_grob->cells.attributes(), "distance"
         );
 
-        std::queue<int> q;
+        HalfedgeHelper chw(*mesh_grob);
+
+        std::queue<index_t> q;
+        std::queue<int> d;
+
+        auto lfe = cell_edge_to_cell_facet_edge(mesh_grob, c, lf, le);
+
+        q.push(chw.id(c, lf, lfe));
+
+        std::cout << "LF:" << lf << ", LE:" << le << std::endl;
+
+        d.push(0);
+        visited[c] = true;
+        dist[c] = Numeric::uint32(0);
+
+        while (!q.empty()) {
+
+            int depth = d.front();
+
+            HalfedgeHelper chw(*mesh_grob, q.front());
+            d.pop(); 
+            q.pop();
+
+            f(c, depth);
+
+
+            if (chw.opp_c().cell() != NO_CELL) {
+                auto chw1 = chw.opp_c().opp_f().next().next().opp_f();
+                auto opp_c1 = chw1.cell();
+
+                if (!visited[opp_c1]) {
+                    q.push(chw1.h);
+                    d.push(depth + 1);
+                    dist[opp_c1] = Numeric::uint32(depth+1);
+                    visited[opp_c1] = true;
+                }
+            }
+
+            if (chw.opp_f().opp_c().cell() != NO_CELL) {
+                auto chw2 = chw.opp_f().opp_c().opp_f().next().next();
+                auto opp_c2 = chw2.cell();
+
+                if (!visited[opp_c2]) {
+                    q.push(chw2.h);
+                    d.push(depth + 1);
+                    dist[opp_c2] = Numeric::uint32(depth+1);
+                    visited[opp_c2] = true;
+                }
+
+            }
+
+            if (chw.next().next().opp_f().opp_c().cell() != NO_CELL) {
+                auto chw3 = chw.next().next().opp_f().opp_c().opp_f();
+                auto opp_c3 = chw3.cell();
+
+                if (!visited[opp_c3]) {
+                    q.push(chw3.h);
+                    d.push(depth + 1);
+                    dist[opp_c3] = Numeric::uint32(depth+1);
+                    visited[opp_c3] = true;
+                }
+
+            }
+
+            if (chw.opp_f().next().next().opp_f().opp_c().cell() != NO_CELL) {
+                auto chw4 = chw.opp_f().next().next().opp_f().opp_c();
+                auto opp_c4 = chw4.cell();
+
+                if (!visited[opp_c4]) {
+                    q.push(chw4.h);
+                    d.push(depth + 1);
+                    dist[opp_c4] = Numeric::uint32(depth+1);
+                    visited[opp_c4] = true;
+                }
+
+            }
+
+        }
+
+    }
+
+    // Propagate an hex layer perpendicular to a given halfedge (Breadth-First-Search)
+    void MeshGrobLaceViewerTool::bfs_lace_propagate(const OGF::MeshGrob *mesh_grob, index_t c, index_t lf, int max_depth, std::function<void(index_t, int)> f) {
+
+
+        // std::vector<bool> visited(mesh_grob->cells.nb());
+
+        Attribute<Numeric::uint8> visited(
+            mesh_grob->cells.attributes(), "filter"
+        );
+
+        Attribute<Numeric::uint32> dist(
+            mesh_grob->cells.attributes(), "distance"
+        );
+
+        std::queue<index_t> q;
         std::queue<int> d;
         q.push(c);
         d.push(0);
@@ -75,133 +299,85 @@ namespace OGF {
         dist[c] = Numeric::uint32(0);
 
 
-        while (!q.empty()) {
-
-            int depth = d.front();
-
-            int c = q.front();
-            d.pop();        
-            
-            q.pop();
-            f(c, depth);
-
-            index_t n_facets = mesh_grob->cells.nb_facets(c);
-
-            for (index_t lf = 0; lf < n_facets; lf++) {
-                index_t adj_c = mesh_grob->cells.adjacent(c, lf);
-                
-                if (adj_c == NO_CELL || visited[adj_c])
-                    continue;
-                
-                q.push(adj_c);
-                d.push(depth + 1);
-                visited[adj_c] = Numeric::uint8(1);
-                dist[adj_c] = Numeric::uint32(depth);
-            }
-
-        }
-    }
-
-    std::tuple<index_t, index_t> MeshGrobLaceViewerTool::pickup_facet(vec3 p0, index_t c_idx) {
-        // Search if point is on facet
-        double min_dist = std::numeric_limits<double>().max();
-        index_t f_idx = -1;
-        index_t lf_idx = -1;
-
-        std::cout << "p0: " << p0 << std::endl;
-
-        std::cout << mesh_grob()->cells.nb_facets(c_idx) << std::endl;
-
-        Attribute<Numeric::uint8> visited(
-            mesh_grob()->cells.attributes(), "facetus"
-        );
-
-        std::cout << "facet attribute: " << visited.size() << std::endl;
-
-        // Search nearest edge
-        for (int lf = 0; lf < mesh_grob()->cells.nb_facets(c_idx); lf++) {
-            
-            index_t fi = mesh_grob()->cells.facet(c_idx, lf);
-            
-            std::cout << "found global fi: " << fi << std::endl;
-
-            visited[mesh_grob()->facets.adjacent(fi, 0)] = OGF::Numeric::uint8(1);
-
-            // std::cout << "nb corners: " << mesh_grob()->facets.nb_corners(fi) << std::endl;
-            // vec3 g;
-            
-            // for (int lc = 0; lc < mesh_grob()->facets.nb_corners(fi); lc++) {
-            //     index_t v_idx = mesh_grob()->facets.corner(fi, lc);
-            //     std::cout << v_idx << std::endl;
-            //     g += mesh_grob()->vertices.point(v_idx);
-            // }
-            // g /= mesh_grob()->facets.nb_corners(fi);
-
-            // // Compute dist from mouse point to bary
-            // double dist = g.distance2(p0);
-            // std::cout << "dist: " << dist << ", for: " << lf << std::endl;
-            
-            // // Keep min dist
-            // if (dist < min_dist) {
-            //     min_dist = dist;
-            //     lf_idx = lf;
-            //     f_idx = fi;
-            // }
-        }
-
-        std::cout << "Found nearest facet: " << f_idx << std::endl;
-
-        return std::tuple<index_t, index_t>(f_idx, lf_idx);
-    }
-
-    // Propagate an hex lace following normal of a given facet (Breadth-First-Search)
-    void MeshGrobLaceViewerTool::bfs_cell_propagate2(const OGF::MeshGrob *mesh_grob, index_t c, index_t lf, int max_depth, std::function<void(index_t, int)> f) {
-
-        Attribute<Numeric::uint8> visited(
-            mesh_grob->cells.attributes(), "filter"
-        );
-        
-
-        std::queue<int> q;
-        std::queue<int> d;
-        q.push(c);
-        d.push(0);
-        visited[c] = true;
-
+        // index_t nlf = 2;
+        index_t nlf = lf;
 
         while (!q.empty()) {
 
             int depth = d.front();
 
-            if (depth >= max_depth)
-                break;
-
-            int c = q.front();
+            index_t c = q.front();
             d.pop();        
             
             q.pop();
             f(c, depth);
 
-            
-            index_t adj_c = mesh_grob->cells.adjacent(c, lf);
-            // // Next cell
-            // index_t nc = mesh_grob->facets.next_corner_around_facet(fi, 0);
-            // index_t nf = mesh_grob->facet_corners.adjacent_facet(nc);
-            // nc = mesh_grob->facets.next_corner_around_facet(nf, 0);
-            // nf = mesh_grob->facet_corners.adjacent_facet(nc);
-            // index_t adj_c = mesh_grob->cell_facets.adjacent_cell(nf);
+            HalfedgeHelper chw(*mesh_grob);
+            chw = chw.id(c, nlf, 0);
+            chw = chw.opp_c();
+            index_t adj_c = chw.cell();
+            nlf = chw.cell_facet();
+            std::cout << "nlf bef:" << nlf << std::endl;
 
-            if (adj_c == NO_CELL)
+            // Get opposite facet
+            if (nlf % 2 == 0)
+                nlf += 1;
+            else 
+                nlf -= 1;
+            
+            std::cout << "nlf aft:" << nlf << std::endl;
+            
+            if (adj_c == NO_CELL || visited[adj_c])
                 continue;
-
-
-
+            
             q.push(adj_c);
             d.push(depth + 1);
-            visited[adj_c] = Numeric::uint8(1);
+            visited[adj_c] = true;
+            dist[adj_c] = Numeric::uint32(depth + 1);
+
+        }
+
+        q.push(c);
+        d.push(0);
+
+        // nlf = 3;
+        nlf = lf % 2 == 0 ? lf + 1 : lf - 1;
+        while (!q.empty()) {
+
+            int depth = d.front();
+
+            index_t c = q.front();
+            d.pop();        
+            
+            q.pop();
+            f(c, depth);
+
+            HalfedgeHelper chw(*mesh_grob);
+            chw = chw.id(c, nlf, 0);
+            chw = chw.opp_c();
+            index_t adj_c = chw.cell();
+            nlf = chw.cell_facet();
+            std::cout << "nlf bef:" << nlf << std::endl;
+
+            // Get opposite facet
+            if (nlf % 2 == 0)
+                nlf += 1;
+            else 
+                nlf -= 1;
+            
+            std::cout << "nlf aft:" << nlf << std::endl;
+            
+            if (adj_c == NO_CELL || visited[adj_c])
+                continue;
+            
+            q.push(adj_c);
+            d.push(depth + 1);
+            visited[adj_c] = true;
+            dist[adj_c] = Numeric::uint32(depth + 1);
 
         }
     }
+
 
     void MeshGrobLaceViewerTool::grab(const RayPick& p_ndc) {
         index_t c_idx = NO_CELL;
@@ -210,6 +386,8 @@ namespace OGF {
         PlainMeshGrobShader* shader = (PlainMeshGrobShader*)mesh_grob()->get_shader();
 
         mesh_grob()->cells.connect();
+        mesh_grob()->facets.connect();
+        
 
         if (p_ndc.button == MOUSE_BUTTON_RIGHT) {
             shader->set_cells_filter(!shader->get_cells_filter());
@@ -278,30 +456,49 @@ namespace OGF {
         for (int i = 0; i < cell_filter.size(); i++)
             cell_filter[i] = false;
 
-
-
         // Set selection on picked cell
         cell_selection[c_idx] = true;
 
         index_t n_facets = mesh_grob()->cells.nb_facets(c_idx);
 
-        bfs_cell_propagate(mesh_grob(), c_idx, get_value(), [](index_t _, int b) {
+        auto [ff, lff] = pickup_facet(picked_point(), c_idx);
+
+        // bfs_lace_propagate(mesh_grob(), c_idx, lff, get_value(), [](index_t _, int b) {
+
+        // });
+
+        auto le = pickup_edge(picked_point(), c_idx);
+        // std::cout << "le:" << le << std::endl << "---" << std::endl;
+
+
+        // for (int e = 0; e < 12; e++) {
+        //     auto lf0 = mesh_grob()->cells.edge_adjacent_facet(c_idx, e, 0);
+        //     auto lf1 = mesh_grob()->cells.edge_adjacent_facet(c_idx, e, 1);
+        //     std::cout << "edge: " << e << std::endl;
+        //     std::cout << cell_edge_to_cell_facet_edge(mesh_grob(), c_idx, lf0, e)<< std::endl; 
+        //     std::cout << cell_edge_to_cell_facet_edge(mesh_grob(), c_idx, lf1, e)<< std::endl; 
+        //     std::cout << "-----" << std::endl;
+        // }
+        
+
+
+
+        bfs_layer_propagate(mesh_grob(), c_idx, lff, le, get_value(), [](index_t _, int b) {
 
         });
 
-        Attribute<Numeric::uint32> dist(
-            mesh_grob()->cells.attributes(), "distance"
-        );
 
-        for (int i = 0; i < mesh_grob()->cells.nb(); i++) {
-            if (dist[i] <= get_value())
-                cell_filter[i] = true;
-        }
 
+        // // Paint layer attribute
+        // if (p_ndc.button == MOUSE_BUTTON_LEFT) {
+        //     shader->set_painting(ATTRIBUTE);
+        //     shader->set_attribute("cells.distance");
+        //     shader->autorange();
+        // }
         // Paint layer attribute
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
             shader->set_painting(ATTRIBUTE);
-            shader->set_attribute("cells.distance");
+            shader->set_attribute("cells.filter");
             shader->autorange();
         }
 

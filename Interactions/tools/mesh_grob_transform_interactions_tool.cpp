@@ -85,13 +85,7 @@ namespace OGF {
 
          PlainMeshGrobShader* shader = (PlainMeshGrobShader*)mesh_grob()->get_shader();
 
-         // unselect_all_verts();
-
          selected_axis = vec3(0, 0, 0);
-         selected_vertex = NO_VERTEX;
-
-         // std::thread loopThread(loop, this);
-         // loopThread.detach();
 
         // Display vertices
         auto vs = shader->get_vertices_style();
@@ -183,18 +177,18 @@ namespace OGF {
       double distz = ToolHelpers::segment_distance(axis[0], axis[3], p_dc);
 
       // Get selected axis / plane
-      if (selected_vertex != NO_VERTEX && ToolHelpers::is_in_2D_convex_quad(get_x_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_x_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
          selected_axis = vec3(0, 1, 1);
          is_grab_interactor = true;
          std::cout << "is in quad x" << std::endl;
       }
-      else if (selected_vertex != NO_VERTEX && ToolHelpers::is_in_2D_convex_quad(get_y_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_y_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
          selected_axis = vec3(1, 0, 1);
          is_grab_interactor = true;
          std::cout << "is in quad y" << std::endl;
 
       }
-      else if (selected_vertex != NO_VERTEX && ToolHelpers::is_in_2D_convex_quad(get_z_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_z_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
          selected_axis = vec3(1, 1, 0);
          is_grab_interactor = true;
          std::cout << "is in quad z" << std::endl;
@@ -214,7 +208,6 @@ namespace OGF {
 
       // If a vertex was picked, change selected vertex and repaint interactor
       if (v_idx != NO_VERTEX && !is_grab_interactor) {
-         selected_vertex = v_idx;
 
          if (pressedKey != "shift")
             unselect_all_verts();
@@ -224,9 +217,7 @@ namespace OGF {
 
       // Unselect
       if (p_ndc.button == MOUSE_BUTTON_RIGHT) {
-         // selected_vertex = NO_VERTEX;
          unselect_all_verts();
-         std::cout << "UNSELECT" << std::endl;
       }
 
       // paint_transform_interactor();
@@ -251,7 +242,6 @@ namespace OGF {
 
       // Displacement is proportional to the direction of the mouse along the axis (see use of dot)
       vec3 delta = vec3{dot(i, m_delta), dot(j, m_delta), dot(k, m_delta)} * 0.5;
-      // mesh_grob()->vertices.point(selected_vertex) += vec3(selected_axis.x * delta.x, selected_axis.y * delta.y, selected_axis.z * delta.z);
 
       for (index_t selected_vertex : get_selected_verts())
          mesh_grob()->vertices.point(selected_vertex) += vec3(selected_axis.x * delta.x, selected_axis.y * delta.y, selected_axis.z * delta.z);
@@ -277,10 +267,9 @@ namespace OGF {
 
     std::array<vec2, 4> MeshGrobTransformInteractionsTool::transform_interactor_axis() {
 
-      if (selected_vertex == NO_VERTEX || get_selected_verts().empty())
+      if (get_selected_verts().empty())
          return  std::array<vec2, 4>({vec2(0,0), vec2(0,0), vec2(0,0), vec2(0,0)});
 
-      // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
       vec3 vp = bary_of_selected_verts();
       vec2 origin = project_point(vp);
       vec2 xp = project_point(vp + vec3(0.05, 0, 0));
@@ -291,7 +280,6 @@ namespace OGF {
     }
 
    std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_x_quad(double size = INTERACTOR_QUADS_SIZE) { 
-      // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
       vec3 vp = bary_of_selected_verts();
 
       
@@ -304,7 +292,6 @@ namespace OGF {
    }
 
    std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_y_quad(double size = INTERACTOR_QUADS_SIZE) { 
-      // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
       vec3 vp = bary_of_selected_verts();
       
       vec2 origin = project_point(vp);
@@ -316,7 +303,6 @@ namespace OGF {
    }
 
    std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_z_quad(double size = INTERACTOR_QUADS_SIZE) { 
-      // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
       vec3 vp = bary_of_selected_verts();
       
       vec2 origin = project_point(vp);
@@ -343,71 +329,62 @@ namespace OGF {
 
     void MeshGrobTransformInteractionsTool::paint_transform_interactor() {
 
-      // std::cout << "paint" << std::endl;
-      // rendering_context()->overlay().clear();
       if (get_selected_verts().empty())
-         return;
+         return;   
+
+      // World coordinate system
+      auto coord_system = transform_interactor_axis();
+      vec2 origin = coord_system[0];
+      vec2 xp = coord_system[1];
+      vec2 yp = coord_system[2];
+      vec2 zp = coord_system[3];
+
+      vec3 col =  selected_axis * 0.2;
+
+      // X-Axis
+      rendering_context()->overlay().segment(
+         origin, xp, Color(.8 + selected_axis.x * .2, 0, 0, 1.0), 1.
+      );
+      rendering_context()->overlay().fillcircle(xp, 5., Color(.8 + selected_axis.x * .2, 0, 0, 1.0));
+
+      // Y-Axis
+      rendering_context()->overlay().segment(
+         origin, yp, Color(0, .8 + selected_axis.y * .2, 0, 1.0), 1.
+      );
+      rendering_context()->overlay().fillcircle(yp, 5., Color(0, .8 + selected_axis.y * .2, 0, 1.0));
+
+      // Z-Axis
+      rendering_context()->overlay().segment(
+         origin, zp, Color(0, 0, .8 + + selected_axis.z * .2, 1.0), 1.
+      );
+      rendering_context()->overlay().fillcircle(zp, 5., Color(0, 0, .8 + selected_axis.z * .2, 1.0));
+
+
+      // Plane highlight colors
+      double r = selected_axis.y > 0 && selected_axis.z > 0 ? 1. : 0.8;
+      double g = selected_axis.x > 0 && selected_axis.z > 0 ? 1. : 0.8;
+      double b = selected_axis.y > 0 && selected_axis.z > 0 ? 1. : 0.8;
+
+      // X-Plane
+      auto x_quad = get_x_quad();
+
+      rendering_context()->overlay().fillquad(
+         x_quad[0], x_quad[1], x_quad[2], x_quad[3], Color(r, 0, 0, 0.3)
+      );
+
+      // Y-Plane
+      auto y_quad = get_y_quad();
+
+      rendering_context()->overlay().fillquad(
+         y_quad[0], y_quad[1], y_quad[2], y_quad[3], Color(0, g, 0, 0.3)
+      );
+
+      // Z-Plane
+      auto z_quad = get_z_quad();
       
-
-      // if (!get_selected_verts().empty()) {
-         
-         // vec3 vp = mesh_grob()->vertices.point(selected_vertex);
-
-         // World coordinate system
-         auto coord_system = transform_interactor_axis();
-         vec2 origin = coord_system[0];
-         vec2 xp = coord_system[1];
-         vec2 yp = coord_system[2];
-         vec2 zp = coord_system[3];
-
-         vec3 col =  selected_axis * 0.2;
-
-         // X-Axis
-         rendering_context()->overlay().segment(
-            origin, xp, Color(.8 + selected_axis.x * .2, 0, 0, 1.0), 1.
-         );
-         rendering_context()->overlay().fillcircle(xp, 5., Color(.8 + selected_axis.x * .2, 0, 0, 1.0));
-
-         // Y-Axis
-         rendering_context()->overlay().segment(
-            origin, yp, Color(0, .8 + selected_axis.y * .2, 0, 1.0), 1.
-         );
-         rendering_context()->overlay().fillcircle(yp, 5., Color(0, .8 + selected_axis.y * .2, 0, 1.0));
-
-         // Z-Axis
-         rendering_context()->overlay().segment(
-            origin, zp, Color(0, 0, .8 + + selected_axis.z * .2, 1.0), 1.
-         );
-         rendering_context()->overlay().fillcircle(zp, 5., Color(0, 0, .8 + selected_axis.z * .2, 1.0));
-
-
-         // Plane highlight colors
-         double r = selected_axis.y > 0 && selected_axis.z > 0 ? 1. : 0.8;
-         double g = selected_axis.x > 0 && selected_axis.z > 0 ? 1. : 0.8;
-         double b = selected_axis.y > 0 && selected_axis.z > 0 ? 1. : 0.8;
-
-         // X-Plane
-         auto x_quad = get_x_quad();
-
-         rendering_context()->overlay().fillquad(
-            x_quad[0], x_quad[1], x_quad[2], x_quad[3], Color(r, 0, 0, 0.3)
-         );
-
-         // Y-Plane
-         auto y_quad = get_y_quad();
-
-         rendering_context()->overlay().fillquad(
-            y_quad[0], y_quad[1], y_quad[2], y_quad[3], Color(0, g, 0, 0.3)
-         );
-
-         // Z-Plane
-         auto z_quad = get_z_quad();
-         
-         rendering_context()->overlay().fillquad(
-            z_quad[0], z_quad[1], z_quad[2], z_quad[3], Color(0, 0, b, 0.3)
-         );
-
-      // }
+      rendering_context()->overlay().fillquad(
+         z_quad[0], z_quad[1], z_quad[2], z_quad[3], Color(0, 0, b, 0.3)
+      );
 
     }
 
@@ -419,11 +396,6 @@ namespace OGF {
       // No axis selected
       selected_axis = vec3(0, 0, 0);
 
-      // if (selected_vertex != NO_VERTEX || get_selected_verts().empty())
-      //    paint_transform_interactor();
-      // else
-      //    rendering_context()->overlay().clear();
-      // paint_transform_interactor();
       paint_overlay(ndc_to_dc(p_ndc.p_ndc));
 
 
