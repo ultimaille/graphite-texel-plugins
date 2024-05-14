@@ -205,8 +205,6 @@ namespace OGF {
 
         q.push(chw.id(c, lf, lfe));
 
-        std::cout << "LF:" << lf << ", LE:" << le << std::endl;
-
         d.push(0);
         visited[c] = true;
         dist[c] = Numeric::uint32(0);
@@ -221,7 +219,7 @@ namespace OGF {
 
             f(c, depth);
 
-
+            // TODO ugly code repeated, refactor !
             if (chw.opp_c().cell() != NO_CELL) {
                 auto chw1 = chw.opp_c().opp_f().next().next().opp_f();
                 auto opp_c1 = chw1.cell();
@@ -378,6 +376,51 @@ namespace OGF {
         }
     }
 
+    // Propagate an hex layer perpendicular to a given halfedge (Breadth-First-Search)
+    void MeshGrobLaceViewerTool::bfs_cell_propagate(const OGF::MeshGrob *mesh_grob, index_t c, int max_depth, std::function<void(index_t, int)> f) {
+
+
+        std::vector<bool> visited(mesh_grob->cells.nb());
+
+        Attribute<Numeric::uint32> dist(
+            mesh_grob->cells.attributes(), "distance"
+        );
+
+        std::queue<int> q;
+        std::queue<int> d;
+        q.push(c);
+        d.push(0);
+        visited[c] = true;
+        dist[c] = Numeric::uint32(0);
+
+
+        while (!q.empty()) {
+
+            int depth = d.front();
+
+            int c = q.front();
+            d.pop();        
+            
+            q.pop();
+            f(c, depth);
+
+            index_t n_facets = mesh_grob->cells.nb_facets(c);
+
+            for (index_t lf = 0; lf < n_facets; lf++) {
+                index_t adj_c = mesh_grob->cells.adjacent(c, lf);
+                
+                if (adj_c == NO_CELL || visited[adj_c])
+                    continue;
+                
+                q.push(adj_c);
+                d.push(depth + 1);
+                visited[adj_c] = Numeric::uint8(1);
+                dist[adj_c] = Numeric::uint32(depth + 1);
+            }
+
+        }
+    }
+
 
     void MeshGrobLaceViewerTool::grab(const RayPick& p_ndc) {
         index_t c_idx = NO_CELL;
@@ -418,10 +461,9 @@ namespace OGF {
 
         // Get picked cell index
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
+            
             c_idx = pick_cell(p_ndc);
-            auto f_idx = pick_facet(p_ndc);
-
-
+            // auto f_idx = pick_facet(p_ndc);
 
             // Reset selection attribute
             for (int i = 0; i < cell_selection.size(); i++)
@@ -463,38 +505,68 @@ namespace OGF {
 
         auto [ff, lff] = pickup_facet(picked_point(), c_idx);
 
-        // bfs_lace_propagate(mesh_grob(), c_idx, lff, get_value(), [](index_t _, int b) {
 
-        // });
 
         auto le = pickup_edge(picked_point(), c_idx);
-        // std::cout << "le:" << le << std::endl << "---" << std::endl;
+       
+
+        switch (extract_type_)
+        {
+        case LACE:
+            bfs_lace_propagate(mesh_grob(), c_idx, lff, get_value(), [](index_t _, int b) {
+
+            });
+
+            break;
+        case LAYER:
+            bfs_layer_propagate(mesh_grob(), c_idx, lff, le, get_value(), [](index_t _, int b) {
+
+            });
+            break;
+        case RING:
+        {
+            // Put a filter on cells / vertices
+            Attribute<Numeric::uint8> cell_filter(
+                mesh_grob()->cells.attributes(), "filter"
+            );
+
+            Attribute<Numeric::uint8> vertices_filter(
+                mesh_grob()->vertices.attributes(), "filter"
+            );
+
+            // Reset filter attribute
+            for (int i = 0; i < cell_filter.size(); i++)
+                cell_filter[i] = false;
+
+            for (int i = 0; i < vertices_filter.size(); i++)
+                vertices_filter[i] = false;
+            
+            bfs_cell_propagate(mesh_grob(), c_idx, get_value(), [](index_t _, int b) {
+
+            });
+
+            Attribute<Numeric::uint32> dist(
+                mesh_grob()->cells.attributes(), "distance"
+            );
+
+            for (int i = 0; i < mesh_grob()->cells.nb(); i++) {
+                if (dist[i] <= get_value()) {
+                    cell_filter[i] = true;
+
+                    for (int lv = 0; lv < mesh_grob()->cells.nb_vertices(i); lv++) {
+                        vertices_filter[mesh_grob()->cells.vertex(i, lv)] = true;
+                    }
+                }
+            }
+        }
+
+            break;
+        default:
+            break;
+        }
 
 
-        // for (int e = 0; e < 12; e++) {
-        //     auto lf0 = mesh_grob()->cells.edge_adjacent_facet(c_idx, e, 0);
-        //     auto lf1 = mesh_grob()->cells.edge_adjacent_facet(c_idx, e, 1);
-        //     std::cout << "edge: " << e << std::endl;
-        //     std::cout << cell_edge_to_cell_facet_edge(mesh_grob(), c_idx, lf0, e)<< std::endl; 
-        //     std::cout << cell_edge_to_cell_facet_edge(mesh_grob(), c_idx, lf1, e)<< std::endl; 
-        //     std::cout << "-----" << std::endl;
-        // }
-        
 
-
-
-        bfs_layer_propagate(mesh_grob(), c_idx, lff, le, get_value(), [](index_t _, int b) {
-
-        });
-
-
-
-        // // Paint layer attribute
-        // if (p_ndc.button == MOUSE_BUTTON_LEFT) {
-        //     shader->set_painting(ATTRIBUTE);
-        //     shader->set_attribute("cells.distance");
-        //     shader->autorange();
-        // }
         // Paint layer attribute
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
             shader->set_painting(ATTRIBUTE);

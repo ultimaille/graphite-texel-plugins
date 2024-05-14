@@ -105,31 +105,32 @@ namespace OGF {
             n_ring_max_ = n_ring_max;
         }
 
-        // enum ExtractType {LAYER, LACE, RING};
+        enum ExtractType {LAYER, LACE, RING};
 
-        // /**
-        //  * \brief The type of extraction
-        //  */
-        // void set_extract_type(ExtractType extract_type) {
-        //     extract_type_ = extract_type;
-        // }
+        /**
+         * \brief The type of extraction
+         */
+        void set_extract_type(ExtractType extract_type) {
+            extract_type_ = extract_type;
+        }
          
-        // ExtractType get_extract_type() const {
-	    //     return extract_type_;
-	    // }
+        ExtractType get_extract_type() const {
+	        return extract_type_;
+	    }
 
     protected:
 
         int n_ring_max_ = 3;
         int value_ = 1;
         int shrink_value = 1;
-        // ExtractType extract_type_ = LAYER;
+        ExtractType extract_type_ = LAYER;
 
     private:
         index_t pickup_edge(vec3 p0, index_t c_idx);
         std::tuple<index_t, index_t> pickup_facet(vec3 p0, index_t c_idx);
         void bfs_lace_propagate(const OGF::MeshGrob *mesh_grob, index_t c, index_t fi, int max_depth, std::function<void(index_t, int)> f);
         void bfs_layer_propagate(const OGF::MeshGrob *mesh_grob, index_t c, index_t lf, index_t le, int max_depth, std::function<void(index_t, int)> f);
+        void bfs_cell_propagate(const OGF::MeshGrob *mesh_grob, index_t c, int max_depth, std::function<void(index_t, int)> f);
     } ;
 
 }
