@@ -188,9 +188,7 @@ namespace OGF {
     void MeshGrobLaceViewerTool::bfs_layer_propagate(const OGF::MeshGrob *mesh_grob, index_t c, index_t lf, index_t le, int max_depth, std::function<void(index_t, int)> f) {
 
         
-        Attribute<Numeric::uint8> visited(
-            mesh_grob->cells.attributes(), "filter"
-        );
+        std::vector<bool> visited(mesh_grob->cells.nb());
 
         Attribute<Numeric::uint32> dist(
             mesh_grob->cells.attributes(), "distance"
@@ -433,18 +431,12 @@ namespace OGF {
         
 
         if (p_ndc.button == MOUSE_BUTTON_RIGHT) {
-            shader->set_cells_filter(!shader->get_cells_filter());
+            bool is_filter = !shader->get_cells_filter();
+            shader->set_cells_filter(is_filter);
+            shader->set_vertices_filter(is_filter);
             
-
-            if (shader->get_cells_filter()) {
-                shader->set_shrink(shrink_value);
-            }
-            else 
-                shader->set_shrink(0);
-
+            shader->set_shrink(shader->get_cells_filter() ? shrink_value : 0);
             shader->autorange();
-
-            
         }
 
         if (p_ndc.button == MOUSE_BUTTON_WHEEL_DOWN && get_value() > 0) {
@@ -461,7 +453,7 @@ namespace OGF {
 
         // Get picked cell index
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
-            
+
             c_idx = pick_cell(p_ndc);
             // auto f_idx = pick_facet(p_ndc);
 
@@ -489,14 +481,30 @@ namespace OGF {
             return;
 
 
-        // Put an attribute on cells 
+
+        // Put a filter on cells / vertices
         Attribute<Numeric::uint8> cell_filter(
             mesh_grob()->cells.attributes(), "filter"
+        );
+
+        Attribute<Numeric::uint8> vertices_filter(
+            mesh_grob()->vertices.attributes(), "filter"
+        );
+
+        Attribute<Numeric::uint32> dist(
+            mesh_grob()->cells.attributes(), "distance"
         );
 
         // Reset filter attribute
         for (int i = 0; i < cell_filter.size(); i++)
             cell_filter[i] = false;
+
+        for (int i = 0; i < vertices_filter.size(); i++)
+            vertices_filter[i] = false;
+
+        // Reset dist
+        for (int i = 0; i < dist.size(); i++)
+            dist[i] = std::numeric_limits<uint>().max();
 
         // Set selection on picked cell
         cell_selection[c_idx] = true;
@@ -509,6 +517,7 @@ namespace OGF {
 
         auto le = pickup_edge(picked_point(), c_idx);
        
+
 
         switch (extract_type_)
         {
@@ -525,39 +534,11 @@ namespace OGF {
             break;
         case RING:
         {
-            // Put a filter on cells / vertices
-            Attribute<Numeric::uint8> cell_filter(
-                mesh_grob()->cells.attributes(), "filter"
-            );
 
-            Attribute<Numeric::uint8> vertices_filter(
-                mesh_grob()->vertices.attributes(), "filter"
-            );
-
-            // Reset filter attribute
-            for (int i = 0; i < cell_filter.size(); i++)
-                cell_filter[i] = false;
-
-            for (int i = 0; i < vertices_filter.size(); i++)
-                vertices_filter[i] = false;
-            
             bfs_cell_propagate(mesh_grob(), c_idx, get_value(), [](index_t _, int b) {
 
             });
 
-            Attribute<Numeric::uint32> dist(
-                mesh_grob()->cells.attributes(), "distance"
-            );
-
-            for (int i = 0; i < mesh_grob()->cells.nb(); i++) {
-                if (dist[i] <= get_value()) {
-                    cell_filter[i] = true;
-
-                    for (int lv = 0; lv < mesh_grob()->cells.nb_vertices(i); lv++) {
-                        vertices_filter[mesh_grob()->cells.vertex(i, lv)] = true;
-                    }
-                }
-            }
         }
 
             break;
@@ -567,10 +548,22 @@ namespace OGF {
 
 
 
+
+        for (int i = 0; i < mesh_grob()->cells.nb(); i++) {
+            if (dist[i] <= get_value()) {
+                cell_filter[i] = true;
+
+                for (int lv = 0; lv < mesh_grob()->cells.nb_vertices(i); lv++) {
+                    vertices_filter[mesh_grob()->cells.vertex(i, lv)] = true;
+                }
+            }
+        }
+
+
         // Paint layer attribute
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
             shader->set_painting(ATTRIBUTE);
-            shader->set_attribute("cells.filter");
+            shader->set_attribute("cells.selection");
             shader->autorange();
         }
 
