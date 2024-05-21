@@ -53,32 +53,6 @@
 
 namespace OGF {
 
-    /**
-     * \brief Tests whether a point belongs to a selection
-     * \details The selection is a rectangle in device coordinates plus an
-     *  optional mask image
-     * \param[in] p the device coordinates of the point to be tested
-     * \param[in] x0 , y0 , x1 , y1 the device coordinates rectangle 
-     * \param[in] mask the optional mask image. Needs to be in GRAYSCALE,
-     *  8 bits per pixel, with same dimensions as rectangle.
-     */
-    bool point_is_selected(
-        const vec2& p,                  
-        index_t x0, index_t y0, index_t x1, index_t y1,  
-        Image* mask = nullptr
-    ) {
-        if(p.x < double(x0) || p.y < double(y0) ||
-           p.x > double(x1) || p.y > double(y1)) {
-            return false;
-        }
-        if(mask != nullptr) {
-            if(*mask->pixel_base_byte_ptr(index_t(p.x)-x0,index_t(p.y)-y0)==0){
-                return false;
-            }
-        }
-        return true;
-    }
-
     MeshGrobTransformInteractionsTool::MeshGrobTransformInteractionsTool(
         ToolsManager* parent
     ) : MeshGrobTool(parent) {
@@ -92,34 +66,73 @@ namespace OGF {
         vs.visible = true;
         shader->set_vertices_style(vs);
 
-      //   auto interpreter = Interpreter::instance_by_language("Lua");
-      //   auto render_area = interpreter->resolve_object("main.render_area", false);
-
         auto key_down_listener = new SlotConnection(scene_graph()->get_render_area(), "key_down", this, "key_down");
         auto key_up_listener = new SlotConnection(scene_graph()->get_render_area(), "key_up", this, "key_up");
         auto mouse_down_listener = new SlotConnection(scene_graph()->get_render_area(), "mouse_down", this, "mouse_down");
         auto mouse_up_listener = new SlotConnection(scene_graph()->get_render_area(), "mouse_up", this, "mouse_up");
         auto mouse_move_listener = new SlotConnection(scene_graph()->get_render_area(), "mouse_move", this, "mouse_move");
         
+        // Listen tools change
+        auto interpreter = Interpreter::instance_by_language("Lua");
+        auto tools_manager = (ToolsManager*)interpreter->resolve_object("tools");
+        auto tool_icon_changed = new SlotConnection(tools_manager, "tool_icon_changed", this, "tool_icon_changed");
+
+        
+      // Set interactors size
+      INTERACTOR_AXIS_SIZE = mesh_grob()->bbox().radius() * 0.075;
+
+      // TODO get object orientation matrix
     }
 
     MeshGrobTransformInteractionsTool::~MeshGrobTransformInteractionsTool() { 
 
     }
 
+   void MeshGrobTransformInteractionsTool::tool_icon_changed(const std::string& value) {
+      // std::cout << "tool changed !" << value << std::endl;
+
+      // Only trigger events when this tool is selected
+      bool will_be_current_tool = value == "tools/../../../plugins/OGF/Interactions/Untitle";
+
+      // Change tool from this to another !
+      if (is_current_tool && !will_be_current_tool) {
+         rendering_context()->overlay().clear();
+      }
+      // Change tool from another to this !
+      if (will_be_current_tool) {
+         paint_transform_interactor();
+         // TODO Focus !
+
+         // Refresh interactors size
+         INTERACTOR_AXIS_SIZE = mesh_grob()->bbox().radius() * 0.075;
+      }
+
+      is_current_tool = will_be_current_tool;
+      
+      std::cout << "is current tool ? " << is_current_tool << std::endl;
+
+   }
+
    void MeshGrobTransformInteractionsTool::mouse_down(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift) {
+      // if (!is_current_tool) return;
+
       std::cout << "button: " << button << std::endl;
 
       pressed_button = button;
       mouse_down_pos = ndc_to_dc(point_ndc);
 
       // Call grab, select multiple points !
-      if (pressedKey == "shift" && button == MOUSE_BUTTON_LEFT)
+      if (pressedKey == "shift" && button == MOUSE_BUTTON_LEFT) {
          grab(RayPick(point_ndc, button));
+         // Update mesh to update display
+         mesh_grob()->update();
+      }
 
    }
 
    void MeshGrobTransformInteractionsTool::mouse_up(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift) {
+      // if (!is_current_tool) return;
+
       pressed_button = MOUSE_BUTTON_NONE;
 
       if (pressedKey == "control")
@@ -127,23 +140,7 @@ namespace OGF {
    }
 
    void MeshGrobTransformInteractionsTool::mouse_move(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, const vec2& delta_ndc, double delta_x_ndc, double delta_y_ndc, const vec2& delta_wc, int button, bool control, bool shift) {
-      // Update paint interactor on mouse move (when moving camera)
-      // if (pressedKey == "control") {
-      //    paint_transform_interactor();
-      // }
-
-      // // Draw rect for selection
-      // if (pressedKey == "shift" && button == MOUSE_BUTTON_LEFT) {
-
-      //    rendering_context->overlay().clear();
-            
-      //    auto pdc = ndc_to_dc(point_ndc);
-      //    rendering_context->overlay().fillrect(
-      //       mouse_down_pos, pdc, Color(.5, .5, .5, 0.3)
-      //    );
-
-         
-      // }
+      // if (!is_current_tool) return;
 
       if (pressedKey == "control")
          paint_overlay(ndc_to_dc(point_ndc));
@@ -151,11 +148,15 @@ namespace OGF {
 
    
    void MeshGrobTransformInteractionsTool::key_down(const std::string& value) {
+      // if (!is_current_tool) return;
+
       pressedKey = value;
       std::cout << "key down:" << value << std::endl;
    }
 
    void MeshGrobTransformInteractionsTool::key_up(const std::string& value) {
+      // if (!is_current_tool) return;
+
       pressedKey = "";
       std::cout << "key up: " << value << std::endl;
    }
@@ -177,18 +178,18 @@ namespace OGF {
       double distz = ToolHelpers::segment_distance(axis[0], axis[3], p_dc);
 
       // Get selected axis / plane
-      if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_x_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_x_quad(), p_dc)) {
          selected_axis = vec3(0, 1, 1);
          is_grab_interactor = true;
          std::cout << "is in quad x" << std::endl;
       }
-      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_y_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_y_quad(), p_dc)) {
          selected_axis = vec3(1, 0, 1);
          is_grab_interactor = true;
          std::cout << "is in quad y" << std::endl;
 
       }
-      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_z_quad(INTERACTOR_QUADS_SIZE), p_dc)) {
+      else if (!get_selected_verts().empty() && ToolHelpers::is_in_2D_convex_quad(get_z_quad(), p_dc)) {
          selected_axis = vec3(1, 1, 0);
          is_grab_interactor = true;
          std::cout << "is in quad z" << std::endl;
@@ -220,7 +221,6 @@ namespace OGF {
          unselect_all_verts();
       }
 
-      // paint_transform_interactor();
       paint_overlay(p_dc);
 
 
@@ -241,7 +241,7 @@ namespace OGF {
       vec2 k = normalize(axis[3] - axis[0]);
 
       // Displacement is proportional to the direction of the mouse along the axis (see use of dot)
-      vec3 delta = vec3{dot(i, m_delta), dot(j, m_delta), dot(k, m_delta)} * 0.5;
+      vec3 delta = vec3{dot(i, m_delta), dot(j, m_delta), dot(k, m_delta)} * sensitivity;
 
       for (index_t selected_vertex : get_selected_verts())
          mesh_grob()->vertices.point(selected_vertex) += vec3(selected_axis.x * delta.x, selected_axis.y * delta.y, selected_axis.z * delta.z);
@@ -265,50 +265,50 @@ namespace OGF {
 
     }
 
-    std::array<vec2, 4> MeshGrobTransformInteractionsTool::transform_interactor_axis() {
+   std::array<vec2, 4> MeshGrobTransformInteractionsTool::transform_interactor_axis() {
 
       if (get_selected_verts().empty())
          return  std::array<vec2, 4>({vec2(0,0), vec2(0,0), vec2(0,0), vec2(0,0)});
 
       vec3 vp = bary_of_selected_verts();
       vec2 origin = project_point(vp);
-      vec2 xp = project_point(vp + vec3(0.05, 0, 0));
-      vec2 yp = project_point(vp + vec3(0, 0.05, 0));
-      vec2 zp = project_point(vp + vec3(0, 0, 0.05));
+      vec2 xp = project_point(vp + vec3(INTERACTOR_AXIS_SIZE, 0, 0));
+      vec2 yp = project_point(vp + vec3(0, INTERACTOR_AXIS_SIZE, 0));
+      vec2 zp = project_point(vp + vec3(0, 0, INTERACTOR_AXIS_SIZE));
       
       return std::array<vec2, 4>({origin, xp, yp, zp});
-    }
+   }
 
-   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_x_quad(double size = INTERACTOR_QUADS_SIZE) { 
+   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_x_quad() { 
       vec3 vp = bary_of_selected_verts();
 
       
       vec2 origin = project_point(vp);
-      vec2 yp = project_point(vp + vec3(0, size, 0));
-      vec2 zp = project_point(vp + vec3(0, 0, size));
-      vec2 yzp = project_point(vp + vec3(0, size, size));
+      vec2 yp = project_point(vp + vec3(0, INTERACTOR_AXIS_SIZE * FACTOR, 0));
+      vec2 zp = project_point(vp + vec3(0, 0, INTERACTOR_AXIS_SIZE * FACTOR));
+      vec2 yzp = project_point(vp + vec3(0, INTERACTOR_AXIS_SIZE * FACTOR, INTERACTOR_AXIS_SIZE * FACTOR));
 
       return { origin, yp, yzp, zp };
    }
 
-   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_y_quad(double size = INTERACTOR_QUADS_SIZE) { 
+   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_y_quad() { 
       vec3 vp = bary_of_selected_verts();
       
       vec2 origin = project_point(vp);
-      vec2 xp = project_point(vp + vec3(size, 0, 0));
-      vec2 zp = project_point(vp + vec3(0, 0, size));
-      vec2 xzp = project_point(vp + vec3(size, 0, size));
+      vec2 xp = project_point(vp + vec3(INTERACTOR_AXIS_SIZE * FACTOR, 0, 0));
+      vec2 zp = project_point(vp + vec3(0, 0, INTERACTOR_AXIS_SIZE * FACTOR));
+      vec2 xzp = project_point(vp + vec3(INTERACTOR_AXIS_SIZE * FACTOR, 0, INTERACTOR_AXIS_SIZE * FACTOR));
 
       return { origin, xp, xzp, zp };
    }
 
-   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_z_quad(double size = INTERACTOR_QUADS_SIZE) { 
+   std::array<vec2, 4> MeshGrobTransformInteractionsTool::get_z_quad() { 
       vec3 vp = bary_of_selected_verts();
       
       vec2 origin = project_point(vp);
-      vec2 xp = project_point(vp + vec3(size, 0, 0));
-      vec2 yp = project_point(vp + vec3(0, size, 0));
-      vec2 xyp = project_point(vp + vec3(size, size, 0));
+      vec2 xp = project_point(vp + vec3(INTERACTOR_AXIS_SIZE * FACTOR, 0, 0));
+      vec2 yp = project_point(vp + vec3(0, INTERACTOR_AXIS_SIZE * FACTOR, 0));
+      vec2 xyp = project_point(vp + vec3(INTERACTOR_AXIS_SIZE * FACTOR, INTERACTOR_AXIS_SIZE * FACTOR, 0));
 
       return { origin, xp, xyp, yp };
    }

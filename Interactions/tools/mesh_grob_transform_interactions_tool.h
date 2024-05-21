@@ -99,9 +99,25 @@ namespace OGF {
         std::vector<index_t> get_selected_verts();
 
         std::array<vec2, 4> transform_interactor_axis();
-        std::array<vec2, 4> get_x_quad(double size);
-        std::array<vec2, 4> get_y_quad(double size);
-        std::array<vec2, 4> get_z_quad(double size);
+        std::array<vec2, 4> get_x_quad();
+        std::array<vec2, 4> get_y_quad();
+        std::array<vec2, 4> get_z_quad();
+        
+        gom_properties:
+        /**
+         * \brief Move sensitivity
+         */
+        void set_sensitivity(double _sensitivity) {
+            sensitivity = _sensitivity;
+        }
+         
+        double get_sensitivity() const {
+	        return sensitivity;
+	    }
+
+    protected:
+
+        double sensitivity = 0.5;
 
 
         gom_slots:
@@ -110,9 +126,13 @@ namespace OGF {
             void mouse_down(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift);
             void mouse_up(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, int button, bool control, bool shift);
             void mouse_move(RenderingContext* rendering_context, const vec2& point_ndc, const vec2& point_wc, const vec2& delta_ndc, double delta_x_ndc, double delta_y_ndc, const vec2& delta_wc, int button, bool control, bool shift);
+            void tool_icon_changed(const std::string& value);
 
     private:
-        static constexpr double INTERACTOR_QUADS_SIZE = 0.015;
+        double INTERACTOR_AXIS_SIZE;
+        static constexpr double FACTOR = 3 / 10.;
+
+        bool is_current_tool = true;
 
         vec2 m_last_pos;
         index_t selected_vertex;
