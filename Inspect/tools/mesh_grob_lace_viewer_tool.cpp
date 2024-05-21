@@ -54,40 +54,26 @@ namespace OGF {
 
         index_t v0 = mesh_grob->cells.edge_vertex(c, le, 0);
         index_t v1 = mesh_grob->cells.edge_vertex(c, le, 1);
-        std::cout << "---" << std::endl;
-        std::cout << "---" << std::endl;
-        std::cout << "---" << std::endl;
+        // std::cout << "---" << std::endl;
+        // std::cout << "---" << std::endl;
+        // std::cout << "---" << std::endl;
 
 
-        std::cout << "cell:" << c << ", f:" << lf << std::endl;
-        // std::cout << v0 << "->" << v1 << std::endl;
-
-        // for (index_t fi = 0; fi < mesh_grob->cells.nb_facets(c); fi++) {
+        // std::cout << "cell:" << c << ", f:" << lf << std::endl;
 
             auto nb_verts = mesh_grob->cells.facet_nb_vertices(c, lf);
 
             for (index_t lv = 0; lv < nb_verts; lv++) {
                 auto fv0 = mesh_grob->cells.facet_vertex(c, lf, lv);
                 auto fv1 = mesh_grob->cells.facet_vertex(c, lf, (lv + 1) % nb_verts);
-                std::cout << fv0 << "->" << fv1 << std::endl;
+                // std::cout << fv0 << "->" << fv1 << std::endl;
 
                 if ((v0 == fv0 && v1 == fv1) || (v0 == fv1 && v1 == fv0)) {
-                    std::cout << "le: " << le << "," << v0 << "->" << v1 << ", lv:" << lv << std::endl;
+                    // std::cout << "le: " << le << "," << v0 << "->" << v1 << ", lv:" << lv << std::endl;
                     return lv;
                 }
             }
 
-            // for (index_t cur_e = 0; cur_e < mesh_grob->cells.facet_nb_vertices(c, fi); cur_e++) {
-
-            // }
-
-            // for (index_t cur_e = 0; cur_e < mesh_grob->cells.facet_nb_vertices(c, fi); cur_e++) {
-                
-            //     if (mesh_grob->cells.facet_vertex(c, fi, cur_e) == v && fi == lf) {
-            //         return cur_e;
-            //     }
-            // }
-        // }
 
         return NO_EDGE;
     }
@@ -112,6 +98,7 @@ namespace OGF {
     MeshGrobLaceViewerTool::MeshGrobLaceViewerTool(
         ToolsManager* parent
     ) : MeshGrobTool(parent) {
+    
 
     }
 
@@ -442,7 +429,7 @@ namespace OGF {
         if (p_ndc.button == MOUSE_BUTTON_WHEEL_DOWN && get_value() > 0) {
             set_value(get_value() - 1);
         }
-        else if (p_ndc.button == MOUSE_BUTTON_WHEEL_UP && get_value() < n_ring_max_ - 1) {
+        else if (p_ndc.button == MOUSE_BUTTON_WHEEL_UP && (max_dist == -1 || get_value() < max_dist - 1)) {
             set_value(get_value() + 1);
         }
 
@@ -473,14 +460,9 @@ namespace OGF {
 
         }
         
-        // // Get 3D picked point on cell
-        // vec3 p0 = picked_point();
-
         // No cell
         if (c_idx == NO_CELL)
             return;
-
-
 
         // Put a filter on cells / vertices
         Attribute<Numeric::uint8> cell_filter(
@@ -495,16 +477,17 @@ namespace OGF {
             mesh_grob()->cells.attributes(), "distance"
         );
 
-        // Reset filter attribute
+        // Reset filter attribute on cell
         for (int i = 0; i < cell_filter.size(); i++)
             cell_filter[i] = false;
 
+        // Reset filter attribute on vertices
         for (int i = 0; i < vertices_filter.size(); i++)
             vertices_filter[i] = false;
 
         // Reset dist
         for (int i = 0; i < dist.size(); i++)
-            dist[i] = std::numeric_limits<uint>().max();
+            dist[i] = std::numeric_limits<Numeric::uint32>().max();
 
         // Set selection on picked cell
         cell_selection[c_idx] = true;
@@ -512,8 +495,6 @@ namespace OGF {
         index_t n_facets = mesh_grob()->cells.nb_facets(c_idx);
 
         auto [ff, lff] = pickup_facet(picked_point(), c_idx);
-
-
 
         auto le = pickup_edge(picked_point(), c_idx);
        
@@ -534,7 +515,6 @@ namespace OGF {
             break;
         case RING:
         {
-
             bfs_cell_propagate(mesh_grob(), c_idx, get_value(), [](index_t _, int b) {
 
             });
@@ -547,10 +527,9 @@ namespace OGF {
         }
 
 
-
-
+        // Add to filter n ring neighbors
         for (int i = 0; i < mesh_grob()->cells.nb(); i++) {
-            if (dist[i] <= get_value()) {
+            if (extract_type_ == RING && dist[i] <= get_value() || extract_type_ != RING && dist[i] < std::numeric_limits<Numeric::uint32>().max()) {
                 cell_filter[i] = true;
 
                 for (int lv = 0; lv < mesh_grob()->cells.nb_vertices(i); lv++) {
@@ -563,9 +542,12 @@ namespace OGF {
         // Paint layer attribute
         if (p_ndc.button == MOUSE_BUTTON_LEFT) {
             shader->set_painting(ATTRIBUTE);
-            shader->set_attribute("cells.selection");
+            shader->set_attribute("cells.filter");
             shader->autorange();
         }
+
+
+
 
         
 

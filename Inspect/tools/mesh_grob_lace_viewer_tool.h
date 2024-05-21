@@ -97,12 +97,12 @@ namespace OGF {
 	        return value_;
 	    }
 
-        int get_n_ring_max() const {
-            return n_ring_max_;
+        int get_max_dist() const {
+            return max_dist;
         }
 
-        void set_n_ring_max(int n_ring_max)  {
-            n_ring_max_ = n_ring_max;
+        void set_max_dist(int max_dist_)  {
+            max_dist = max_dist_;
         }
 
         enum ExtractType {LAYER, LACE, RING};
@@ -112,6 +112,21 @@ namespace OGF {
          */
         void set_extract_type(ExtractType extract_type) {
             extract_type_ = extract_type;
+            switch (extract_type)
+            {
+            case LAYER:
+                max_dist = -1;
+                break;
+            case LACE:
+                max_dist = -1;
+                break;
+            case RING:
+                max_dist = 3;
+            default:
+                break;
+            }
+
+            value_ = 1;
         }
          
         ExtractType get_extract_type() const {
@@ -120,7 +135,7 @@ namespace OGF {
 
     protected:
 
-        int n_ring_max_ = 3;
+        int max_dist = 3;
         int value_ = 1;
         int shrink_value = 1;
         ExtractType extract_type_ = LAYER;
