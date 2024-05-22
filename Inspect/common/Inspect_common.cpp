@@ -44,7 +44,6 @@
 #include <OGF/gom/types/gom_defs.h>
 #include <OGF/scene_graph/types/scene_graph_library.h>
 
-#include <OGF/Inspect/tools/mesh_grob_ring_viewer_tool.h>
 #include <OGF/Inspect/tools/mesh_grob_lace_viewer_tool.h>
 #include <OGF/Inspect/commands/mesh_grob_conditional_filter_commands.h>
 // [includes insertion point] (do not delete this line)
@@ -59,7 +58,6 @@ namespace OGF {
 
         gom_package_initialize(Inspect) ;
 
-        ogf_register_grob_tool<OGF::MeshGrob,MeshGrobRingViewerTool>();
         ogf_register_grob_tool<OGF::MeshGrob,MeshGrobLaceViewerTool>();
         ogf_register_grob_commands<OGF::MeshGrob,OGF::MeshGrobConditionalFilterCommands>();
         // [source insertion point] (do not delete this line)

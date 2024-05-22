@@ -52,10 +52,9 @@ namespace OGF {
 
     // specifies in which box this tool will be added 
     gom_attribute(category,"Inspect") 
-    gom_attribute(icon,"lace") 
     //an icon can be specified for this tool
     //(this example corresponds to GRAPHITE_ROOT/lib/icons/my_icon.xpm)
-    // gom_attribute(icon,"my_icon") 
+    gom_attribute(icon,"../../../plugins/OGF/Inspect/n_ring") 
 
     // specifies the help bubble associated with this tool 
     gom_attribute(help,"LaceViewer tool") 

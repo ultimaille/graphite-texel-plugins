@@ -421,8 +421,10 @@ namespace OGF {
             bool is_filter = !shader->get_cells_filter();
             shader->set_cells_filter(is_filter);
             shader->set_vertices_filter(is_filter);
-            
             shader->set_shrink(shader->get_cells_filter() ? shrink_value : 0);
+
+
+
             shader->autorange();
         }
 
@@ -498,7 +500,6 @@ namespace OGF {
 
         auto le = pickup_edge(picked_point(), c_idx);
        
-
 
         switch (extract_type_)
         {
