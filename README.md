@@ -39,11 +39,29 @@ The procedure for upgrading is the same as for installation, you just need to re
 
 ### Tools
 
- - Tranform tool: move points in a more friendly way
- - N-Ring: visualize neighborhood of a cell in a volume mesh
- - Extract layer: visualize a hex layer by selecting a cell edge
- - Extract lace: visualize a hex lace by selecting a cell facet
+#### Move points
 
+Move points in a more friendly way.
+
+![Move point](images/move_point_plugin.gif)
+
+#### View lace
+
+Extract & view lace: visualize a hex lace by selecting a cell facet.
+
+![View lace](images/view_lace_plugin.gif)
+
+#### View layer
+
+Extract & view layer: visualize a hex layer by selecting a cell edge.
+
+![View layer](images/view_layer_plugin.gif)
+
+#### View ring
+
+Extract & view n-ring: visualize neighborhood of a cell in a volume mesh.
+
+![View ring](images/view_ring_plugin.gif)
 
 ### Commands
 
