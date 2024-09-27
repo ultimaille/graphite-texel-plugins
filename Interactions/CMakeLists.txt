@@ -56,6 +56,7 @@ set(
 aux_source_directories(SOURCES "Source Files\\common" common)
 aux_source_directories(SOURCES "Source Files\\algo" algo)
 aux_source_directories(SOURCES "Source Files\\tools" tools)
+aux_source_directories(SOURCES "Source Files\\commands" commands)
 gomgen(Interactions)
 
 add_library(Interactions ${SOURCES})

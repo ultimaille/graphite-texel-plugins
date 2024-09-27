@@ -25,7 +25,6 @@ namespace GEO {
 	}
 
 	double tri_area(vec2 A, vec2 B, vec2 C) {
-		// return (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)) * .5;
 		return .5*((B.y-A.y)*(B.x+A.x) + (C.y-B.y)*(C.x+B.x) + (A.y-C.y)*(A.x+C.x));
 	}
 
