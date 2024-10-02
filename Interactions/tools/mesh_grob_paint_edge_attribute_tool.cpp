@@ -64,9 +64,7 @@ namespace OGF {
      * \param[in] mask an optional pointer to a mask (or nullptr for no mask).
      * \param[in] doit the function to be called for each unique picked element
      */
-    void for_each_picked_element(
-        Image* picking_image, Image* mask, std::function<void(index_t)> doit
-    ) {
+    void for_each_picked_element(Image* picking_image, Image* mask, std::function<void(index_t)> doit) {
         geo_assert(picking_image->color_encoding() == Image::RGBA);
         geo_assert(picking_image->component_encoding() == Image::BYTE);
 
@@ -356,12 +354,65 @@ namespace OGF {
             where = MESH_EDGES;
         }
 
+        // We have two type of CAD inputs:
+        // - A surface + polyline (from GMSH) - polyline is feature lines of CAD
+        // - A surface in wich each halfedge tagged as is_feature = true is a feature line
+
+        // To match with these two inputs:
+        // 1. If it exists a surface + a polyline, check that all polyline segments matches with a halfedge (corner)
+        // 2. If yes, feature line are already represented by this polyline, so we just have to tag the matching halfedges with is_feature=true
+        // 3. If no, setup a polyline according to is_feature attribute on halfedge
+
+        // Check if a polyline already exist in model
+        if (mesh_grob()->edges.nb() > 0) {
+            // If yes, we mark halfedges (corners) that match with a edge as a feature line
+
+            // Get halfedge is_feature attribute
+            Attribute<Numeric::uint8> is_feature(
+                mesh_grob()->facet_corners.attributes(), "is_feature"
+            );
+
+            // Check that polyline is a representation of feature lines
+            for (index_t e : mesh_grob()->edges) {
+                index_t v0 = mesh_grob()->edges.vertex(e, 0);
+                index_t v1 = mesh_grob()->edges.vertex(e, 1);
+                
+                bool found = false;
+                for (index_t f : mesh_grob()->facets) {
+                    for (index_t fc : mesh_grob()->facets.corners(f)) {
+                        index_t nfc = mesh_grob()->facets.next_corner_around_facet(f, fc);
+                        index_t vc0 = mesh_grob()->facet_corners.vertex(fc);
+                        index_t vc1 = mesh_grob()->facet_corners.vertex(nfc);
+                        if (v0 == vc0 && v1 == vc1) {
+                            found = true;
+                            index_t adj_f = mesh_grob()->facet_corners.adjacent_facet(fc);
+                            is_feature[fc] = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found) {
+                    Logger::err("Mesh") << "Mesh polyline is not feature lines. Unable to use this tool on it !" << std::endl;
+                    return;
+                }
+
+            }
+
+            
+
+        }
+
+        // Generate a polyline that represent feature lines
+        // only one time !
         if (!is_poly_generated[mesh_grob()->name()])
             setup_polyline();
     }
 
+    /**
+     * Setup a polyline that represent feature lines (needed only for interaction)
+     */
     void MeshGrobPaintEdgeAttributeTool::setup_polyline() {
-        std::cout << "setup poly..." << std::endl;
 
         // Get halfedge is_feature attribute
         Attribute<Numeric::uint8> is_feature(
@@ -378,6 +429,14 @@ namespace OGF {
         }
 
         std::cout << "n edges: " << n_edges << std::endl;
+
+        // No features found, no polyline to setup
+        if (n_edges == 0) {
+            return;
+        }
+
+        std::cout << "setup poly..." << std::endl;
+
 
         MeshGrob& M = *mesh_grob();
         if(M.vertices.dimension() < 3) {
