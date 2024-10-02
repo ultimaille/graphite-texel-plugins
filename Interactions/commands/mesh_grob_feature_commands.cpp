@@ -40,17 +40,17 @@
  
 
 
-#include <OGF/Interactions/commands/mesh_grob_remove_feature_commands.h>
+#include <OGF/Interactions/commands/mesh_grob_feature_commands.h>
 
 namespace OGF {
 
-    MeshGrobRemoveFeatureCommands::MeshGrobRemoveFeatureCommands() { 
+    MeshGrobFeatureCommands::MeshGrobFeatureCommands() { 
     }
         
-    MeshGrobRemoveFeatureCommands::~MeshGrobRemoveFeatureCommands() { 
+    MeshGrobFeatureCommands::~MeshGrobFeatureCommands() { 
     }        
 
-    void MeshGrobRemoveFeatureCommands::remove_selected() {
+    void MeshGrobFeatureCommands::remove_selected() {
         // Get halfedge is_feature attribute
         Attribute<Numeric::uint8> is_feature(
             mesh_grob()->facet_corners.attributes(), "is_feature"

@@ -46,7 +46,7 @@
 
 #include <OGF/Interactions/tools/mesh_grob_transform_interactions_tool.h>
 #include <OGF/Interactions/tools/mesh_grob_paint_edge_attribute_tool.h>
-#include <OGF/Interactions/commands/mesh_grob_remove_feature_commands.h>
+#include <OGF/Interactions/commands/mesh_grob_feature_commands.h>
 // [includes insertion point] (do not delete this line)
 
 namespace OGF {
@@ -61,7 +61,7 @@ namespace OGF {
 
         ogf_register_grob_tool<OGF::MeshGrob,MeshGrobTransformInteractionsTool>();
         ogf_register_grob_tool<OGF::MeshGrob,MeshGrobPaintEdgeAttributeTool>();
-        ogf_register_grob_commands<OGF::MeshGrob,OGF::MeshGrobRemoveFeatureCommands>();
+        ogf_register_grob_commands<OGF::MeshGrob,OGF::MeshGrobFeatureCommands>();
         // [source insertion point] (do not delete this line)
 
         // Insert package initialization stuff here ...

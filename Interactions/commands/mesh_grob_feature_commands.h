@@ -39,18 +39,18 @@
  */
  
 
-#ifndef H__OGF_INTERACTIONS_COMMANDS_MESH_GROB_REMOVE_FEATURE_COMMANDS__H
-#define H__OGF_INTERACTIONS_COMMANDS_MESH_GROB_REMOVE_FEATURE_COMMANDS__H
+#ifndef H__OGF_INTERACTIONS_COMMANDS_mesh_grob_feature_commands__H
+#define H__OGF_INTERACTIONS_COMMANDS_mesh_grob_feature_commands__H
 
 #include <OGF/Interactions/common/common.h>
 #include <OGF/mesh/commands/mesh_grob_commands.h>
 
 namespace OGF {
 
-    gom_class Interactions_API MeshGrobRemoveFeatureCommands : public MeshGrobCommands {
+    gom_class Interactions_API MeshGrobFeatureCommands : public MeshGrobCommands {
     public:
-        MeshGrobRemoveFeatureCommands();
-        ~MeshGrobRemoveFeatureCommands() override;
+        MeshGrobFeatureCommands();
+        ~MeshGrobFeatureCommands() override;
 
     gom_slots:
 
@@ -60,7 +60,7 @@ namespace OGF {
 	//     tags can be used:
 	//
         //      \menu  indicate a menu relative to current menu
-        //           (MeshGrobRemoveFeatureCommands), or an absolute menu (starting
+        //           (MeshGrobFeatureCommands), or an absolute menu (starting
         //           with a '/') to insert the command in existing
         //           menus (for instance /Surface/Remesh)
 	//          
