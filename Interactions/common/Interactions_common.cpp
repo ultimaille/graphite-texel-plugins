@@ -45,7 +45,6 @@
 #include <OGF/scene_graph/types/scene_graph_library.h>
 
 #include <OGF/Interactions/tools/mesh_grob_transform_interactions_tool.h>
-#include <OGF/Interactions/tools/mesh_grob_transform_interactions2_tool.h>
 #include <OGF/Interactions/tools/mesh_grob_paint_edge_attribute_tool.h>
 #include <OGF/Interactions/commands/mesh_grob_remove_feature_commands.h>
 // [includes insertion point] (do not delete this line)
@@ -61,7 +60,6 @@ namespace OGF {
         gom_package_initialize(Interactions) ;
 
         ogf_register_grob_tool<OGF::MeshGrob,MeshGrobTransformInteractionsTool>();
-        ogf_register_grob_tool<OGF::MeshGrob,MeshGrobTransformInteractions2Tool>();
         ogf_register_grob_tool<OGF::MeshGrob,MeshGrobPaintEdgeAttributeTool>();
         ogf_register_grob_commands<OGF::MeshGrob,OGF::MeshGrobRemoveFeatureCommands>();
         // [source insertion point] (do not delete this line)
