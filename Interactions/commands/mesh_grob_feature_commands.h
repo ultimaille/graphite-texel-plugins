@@ -54,22 +54,8 @@ namespace OGF {
 
     gom_slots:
 
-        //   Doxygen comments are parsed and used by Gomgen to
-        //     generate tooltips.
-        //   In addition to standard Doxygen tags, the following 
-	//     tags can be used:
-	//
-        //      \menu  indicate a menu relative to current menu
-        //           (MeshGrobFeatureCommands), or an absolute menu (starting
-        //           with a '/') to insert the command in existing
-        //           menus (for instance /Surface/Remesh)
-	//          
-        //      \advanced  all subsequent parameters are in the
-        //        advanced section of the command (displayed when
-        //        clicking on it)
-
         /**
-          * \brief Computes the age of the captain.
+          * \brief Remove selected feature lines
           */
         void remove_selected();
 

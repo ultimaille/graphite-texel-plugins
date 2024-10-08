@@ -42,6 +42,8 @@
 
 #include <OGF/Interactions/commands/mesh_grob_feature_commands.h>
 
+#include "../tools/FeatureLinesSetup.h"
+
 namespace OGF {
 
     MeshGrobFeatureCommands::MeshGrobFeatureCommands() { 
@@ -50,6 +52,9 @@ namespace OGF {
     MeshGrobFeatureCommands::~MeshGrobFeatureCommands() { 
     }        
 
+    /**
+     * \brief Remove the selected feature lines
+     */
     void MeshGrobFeatureCommands::remove_selected() {
         // Get halfedge is_feature attribute
         Attribute<Numeric::uint8> is_feature(
@@ -66,12 +71,26 @@ namespace OGF {
             mesh_grob()->edges.attributes(), "selection"
         );
 
+        // As a feature line is composed by many edge
+        // We search selected edges, in order to remove them
+        GEO::vector<index_t> selected_edges;
+
         for (index_t e : mesh_grob()->edges) {
+            // If edge is selected, 
             if (edge_selection[e]) {
+                // Get corresponding corner
                 index_t c = corner_matching[e];
+                // Set is_feature attribute of the corresponding corner to false
                 is_feature[c] = false;
+                // Add edge index to selected_edges
+                selected_edges.push_back(e);
             }
         }
+        
+
+        // Remove feature line visually (remove polyline edges) thanks to feature line manager
+        auto featurelines_setup = FeatureLinesSetup::get(mesh_grob());
+        featurelines_setup->remove(selected_edges);
     }       
 
 }
