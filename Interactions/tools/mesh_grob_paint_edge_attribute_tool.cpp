@@ -53,6 +53,9 @@
 #include <geogram/basic/algorithm.h>
 
 #include <stack>
+#include <memory>
+
+#include "FeatureLinesSetup.h"
 
 namespace OGF {
 
@@ -97,69 +100,6 @@ namespace OGF {
             if(*p != index_t(-1)) {
                 doit(*p);
             }
-        }
-    }
-
-    /**
-     * \brief Calls a user-specified function for each edge in a connected
-     *  component incident to a given vertex in a feature line
-     * \param[in] mesh_grob the mesh
-     * \param[in] seed_edge one of the facets of the connected component
-     * \param[in] doit the function to be called for each edge of the
-     *  connected component incident to \p seed_edge
-     */
-    void for_each_connected_edge_in_feature_line(
-        MeshGrob* mesh_grob, index_t seed_edge,
-        std::function<bool(index_t)> doit        
-    ) {
-        std::vector<bool> visited(mesh_grob->edges.nb(),false);
-        std::stack<index_t> S;
-        S.push(seed_edge);
-
-        // Search for reverse edge of seed (and propagate to its connected edge through the queue !)
-        for (index_t e : mesh_grob->edges) {
-            if (mesh_grob->edges.vertex(e, 0) == mesh_grob->edges.vertex(seed_edge, 1) && 
-                mesh_grob->edges.vertex(e, 1) == mesh_grob->edges.vertex(seed_edge, 0)) {
-                S.push(e);
-                visited[e] = true;
-                doit(e);
-            }
-        }
-
-        visited[seed_edge] = true;
-        doit(seed_edge);
-
-        while(!S.empty()) {
-            index_t e = S.top();
-            S.pop();
-            
-            index_t v[] = {mesh_grob->edges.vertex(e, 0), mesh_grob->edges.vertex(e, 1)};
-
-            // Search for next and prev edges
-            int count[2] = {0};
-            index_t conn_e[2] = {NO_EDGE};
-
-            for (int i = 0; i < 2; i++) {
-                for (index_t ne : mesh_grob->edges) {
-                    if (ne == e)
-                        continue;
-
-                    // if (mesh_grob->edges.vertex(ne, 1) == v[i] || mesh_grob->edges.vertex(ne, 0) == v[i]) {
-                    if (mesh_grob->edges.vertex(ne, i) == v[i]) {
-                        count[i]++;
-                        conn_e[i] = ne;
-                    }
-
-                }
-
-                if (count[i] == 1 && !visited[conn_e[i]]) {
-                    if (doit(conn_e[i])) {
-                        S.push(conn_e[i]);
-                    }
-                    visited[conn_e[i]] = true;
-                }
-            }
-
         }
     }
 
@@ -326,7 +266,7 @@ namespace OGF {
       stroke_mode_ = true;
     }
 
-    MeshGrobPaintEdgeAttributeTool::~MeshGrobPaintEdgeAttributeTool() { 
+    MeshGrobPaintEdgeAttributeTool::~MeshGrobPaintEdgeAttributeTool() {
     }
 
     void MeshGrobPaintEdgeAttributeTool::reset() {
@@ -354,6 +294,8 @@ namespace OGF {
             where = MESH_EDGES;
         }
 
+        auto feature_lines_setup = FeatureLinesSetup::get(mesh_grob());
+
         // We have two type of CAD inputs:
         // - A surface + polyline (from GMSH) - polyline is feature lines of CAD
         // - A surface in wich each halfedge tagged as is_feature = true is a feature line
@@ -366,118 +308,17 @@ namespace OGF {
         // Check if a polyline already exist in model
         if (mesh_grob()->edges.nb() > 0) {
             // If yes, we mark halfedges (corners) that match with a edge as a feature line
-
-            // Get halfedge is_feature attribute
-            Attribute<Numeric::uint8> is_feature(
-                mesh_grob()->facet_corners.attributes(), "is_feature"
-            );
-
-            // Check that polyline is a representation of feature lines
-            for (index_t e : mesh_grob()->edges) {
-                index_t v0 = mesh_grob()->edges.vertex(e, 0);
-                index_t v1 = mesh_grob()->edges.vertex(e, 1);
-                
-                bool found = false;
-                for (index_t f : mesh_grob()->facets) {
-                    for (index_t fc : mesh_grob()->facets.corners(f)) {
-                        index_t nfc = mesh_grob()->facets.next_corner_around_facet(f, fc);
-                        index_t vc0 = mesh_grob()->facet_corners.vertex(fc);
-                        index_t vc1 = mesh_grob()->facet_corners.vertex(nfc);
-                        if (v0 == vc0 && v1 == vc1) {
-                            found = true;
-                            index_t adj_f = mesh_grob()->facet_corners.adjacent_facet(fc);
-                            is_feature[fc] = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!found) {
-                    Logger::err("Mesh") << "Mesh polyline is not feature lines. Unable to use this tool on it !" << std::endl;
-                    return;
-                }
-
-            }
-
-            
-
+            feature_lines_setup->setup_attribute();
         }
 
         // Generate a polyline that represent feature lines
         // only one time !
-        if (!is_poly_generated[mesh_grob()->name()])
-            setup_polyline();
-    }
-
-    /**
-     * Setup a polyline that represent feature lines (needed only for interaction)
-     */
-    void MeshGrobPaintEdgeAttributeTool::setup_polyline() {
-
-        // Get halfedge is_feature attribute
-        Attribute<Numeric::uint8> is_feature(
-            mesh_grob()->facet_corners.attributes(), "is_feature"
-        );
-
-        std::cout << "is_feature size: " << is_feature.size() << std::endl;
-
-        index_t n_edges = 0;
-        for (index_t i = 0; i < is_feature.size(); i++) {
-            if (!is_feature[i])
-                continue;
-            n_edges++;
+        if (!feature_lines_setup->is_generated()) {
+            // Clean up before reconstruct
+            feature_lines_setup->clean_polyline();
+            // Setup polyline following attribute is_feature
+            feature_lines_setup->setup_polyline();
         }
-
-        std::cout << "n edges: " << n_edges << std::endl;
-
-        // No features found, no polyline to setup
-        if (n_edges == 0) {
-            return;
-        }
-
-        std::cout << "setup poly..." << std::endl;
-
-
-        MeshGrob& M = *mesh_grob();
-        if(M.vertices.dimension() < 3) {
-            Logger::err("Mesh") << "Dimension smaller than 3" << std::endl;
-            return;
-        }
-
-        index_t off = M.edges.create_edges(n_edges);
-
-        // Create an attribute on edge, that map edge to halfedge !
-        Attribute<Numeric::uint32> corner_matching(
-            mesh_grob()->edges.attributes(), "corner_matching"
-        );
-
-        int n_edge = 0;
-
-        for (index_t f : mesh_grob()->facets) {
-            for (index_t fc : mesh_grob()->facets.corners(f)) {
-
-                index_t nfc = mesh_grob()->facets.next_corner_around_facet(f, fc);
-
-                if (is_feature[fc]) {
-                    index_t v0 = mesh_grob()->facet_corners.vertex(fc);
-                    index_t v1 = mesh_grob()->facet_corners.vertex(nfc);
-
-                    M.edges.set_vertex(off + n_edge, 0, v0);
-                    M.edges.set_vertex(off + n_edge, 1, v1);
-                    
-                    // Map edge to halfedge
-                    corner_matching[n_edge] = fc;
-
-                    n_edge++;
-                }
-            }
-            
-        }
-  
-        M.update();
-
-        is_poly_generated[mesh_grob()->name()] = true;
-
     }
 
     void MeshGrobPaintEdgeAttributeTool::for_each_stroke_quad(
@@ -817,6 +658,8 @@ namespace OGF {
         //     }
         // } else {
 
+            auto featurelines_setup = FeatureLinesSetup::get(mesh_grob());
+
             // In standard mode, get picking image, apply the (optional) mask
             // and find all the picked elements
             
@@ -840,7 +683,7 @@ namespace OGF {
                     if (where == MeshElementsFlags::MESH_EDGES) {
 
                         // Paint all connected edges that form a feature line
-                        for_each_connected_edge_in_feature_line(mesh_grob(), picked_element, [&](index_t connected_e)->bool {
+                        featurelines_setup->for_each_connected_edge_in_feature_line(picked_element, [&](index_t connected_e)->bool {
 
                             paint_attribute(
                                 mesh_grob(), where,

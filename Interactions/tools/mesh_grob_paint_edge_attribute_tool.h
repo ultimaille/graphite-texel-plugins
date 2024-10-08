@@ -47,6 +47,8 @@
 #include <OGF/scene_graph/tools/tool.h>
 #include <OGF/scene_graph/tools/tools_manager.h>
 
+#include "FeatureLinesSetup.h"
+
 namespace OGF {
 
     /**
@@ -64,10 +66,10 @@ namespace OGF {
 
     //an icon can be specified for this tool
     //(this example corresponds to GRAPHITE_ROOT/lib/icons/my_icon.xpm)
-    // gom_attribute(icon,"my_icon") 
+    gom_attribute(icon,"../../../plugins/OGF/Interactions/paint_feature") 
 
     // specifies the help bubble associated with this tool 
-    gom_attribute(help,"PaintEdgeAttribute tool") 
+    gom_attribute(help,"Paint feature line tool") 
 
     // the message is displayed in the status bar when this
     // tool is selected 
@@ -163,6 +165,7 @@ namespace OGF {
         vector<vec2> stroke_;
 
         std::map<std::string, bool> is_poly_generated;
+        std::map<std::string, FeatureLinesSetup*> feature_lines_setups;
     } ;
 
 }
